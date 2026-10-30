@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AI英単語クイズ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --pink: #ff6b9d;
+            --coral: #ff8e6b;
+            --sky: #5b8def;
+            --mint: #3ecf8e;
+            --cream: #fff8f5;
+            --ink: #2d2a32;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            background: linear-gradient(160deg, #ffe4ec 0%, #e8f0ff 45%, #e6fff4 100%);
+            color: var(--ink);
+            touch-action: manipulation;
+            min-height: 100dvh;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.94);
+            backdrop-filter: blur(12px);
+            border: 2px solid rgba(255, 255, 255, 0.7);
+        }
+        .option-btn {
+            transition: transform 0.15s ease, background 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+        }
+        .option-btn:active:not(:disabled) { transform: scale(0.97); }
+        .option-btn:disabled,
+        .option-btn.disabled {
+            opacity: 0.45;
+            background: #e5e7eb !important;
+            border-color: #d1d5db !important;
+            color: #9ca3af !important;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+        .level-btn.selected {
+            outline: 3px solid #5b8def;
+            outline-offset: 2px;
+            transform: scale(1.02);
+        }
+        @keyframes pop-in {
+            0% { opacity: 0; transform: scale(0.85) translateY(12px); }
+            100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .modal-pop { animation: pop-in 0.28s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        @keyframes bounce-short {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-6px); }
+        }
+        .animate-bounce-short { animation: bounce-short 0.5s ease infinite; }
+        @keyframes pulse-soft {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.04); }
+        }
+        .animate-pulse-soft { animation: pulse-soft 2s ease infinite; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .screen { display: none; }
+        .screen.active { display: flex; }
+    </style>
+</head>
+<body class="flex items-center justify-center p-3 sm:p-4">
+
+<div class="w-full max-w-md glass-card rounded-[2rem] shadow-2xl overflow-hidden flex flex-col relative min-h-[640px] max-h-[92dvh]">
+
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-pink-500 via-rose-400 to-orange-400 text-white px-5 py-4 flex-shrink-0">
+        <div class="flex justify-between items-center mb-2">
+            <span class="font-extrabold text-lg flex items-center gap-2">
+                <i class="fa-solid fa-graduation-cap text-yellow-200"></i>
+                AI英単語クイズ
+            </span>
+            <div id="progress-label" class="bg-white/20 px-3 py-1 rounded-full text-xs font-bold border border-white/30">
+                第 <span id="current-q-num">1</span> / <span id="total-q-num">5</span> 問
+            </div>
+        </div>
+        <div class="w-full bg-black/20 h-2.5 rounded-full overflow-hidden">
+            <div id="progress-bar" class="bg-gradient-to-r from-yellow-200 to-amber-300 h-full rounded-full transition-all duration-300 w-0"></div>
+        </div>
+    </header>
+
+    <main class="flex-1 p-5 overflow-y-auto no-scrollbar relative">
+
+        <!-- 1. スタート画面：難易度・テーマ選択 -->
+        <div id="start-screen" class="screen active flex-col h-full justify-between space-y-4">
+            <div class="text-center space-y-2 pt-1">
+                <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-pink-400 to-orange-400 text-white flex items-center justify-center text-3xl shadow-lg animate-pulse-soft">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                </div>
+                <h1 class="text-2xl font-extrabold text-slate-800">4択英単語クイズ</h1>
+                <p class="text-xs text-slate-500">レベルとテーマを選んでスタート！</p>
+            </div>
+
+            <div class="space-y-2">
+                <p class="text-xs font-bold text-slate-600 pl-1">① 難易度を選ぶ</p>
+                <div class="grid grid-cols-3 gap-2">
+                    <button type="button" class="level-btn selected bg-emerald-100 border-2 border-emerald-300 text-emerald-800 font-bold py-3 rounded-2xl text-sm" data-level="basic" onclick="selectLevel(this)">
+                        🌱 中1
+                    </button>
+                    <button type="button" class="level-btn bg-sky-100 border-2 border-sky-200 text-sky-800 font-bold py-3 rounded-2xl text-sm" data-level="normal" onclick="selectLevel(this)">
+                        ⭐ 中2
+                    </button>
+                    <button type="button" class="level-btn bg-amber-100 border-2 border-amber-200 text-amber-800 font-bold py-3 rounded-2xl text-sm" data-level="hard" onclick="selectLevel(this)">
+                        🔥 中3
+                    </button>
+                </div>
+            </div>
+
+            <div class="space-y-2">
+                <p class="text-xs font-bold text-slate-600 pl-1">② 好きなテーマを入力</p>
+                <input type="text" id="theme-input" list="theme-suggestions" placeholder="例：アニメ、料理、スポーツ…"
+                    class="w-full px-4 py-3 text-sm bg-white rounded-2xl border-2 border-pink-100 focus:outline-none focus:ring-2 focus:ring-pink-400 placeholder:text-slate-400">
+                <datalist id="theme-suggestions">
+                    <option value="アニメ"></option>
+                    <option value="料理"></option>
+                    <option value="スポーツ"></option>
+                    <option value="動物"></option>
+                    <option value="宇宙"></option>
+                </datalist>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" onclick="setTheme('アニメ')" class="text-xs bg-pink-50 text-pink-600 border border-pink-200 px-3 py-1.5 rounded-full font-bold">アニメ</button>
+                    <button type="button" onclick="setTheme('料理')" class="text-xs bg-orange-50 text-orange-600 border border-orange-200 px-3 py-1.5 rounded-full font-bold">料理</button>
+                    <button type="button" onclick="setTheme('スポーツ')" class="text-xs bg-sky-50 text-sky-600 border border-sky-200 px-3 py-1.5 rounded-full font-bold">スポーツ</button>
+                    <button type="button" onclick="setTheme('動物')" class="text-xs bg-emerald-50 text-emerald-600 border border-emerald-200 px-3 py-1.5 rounded-full font-bold">動物</button>
+                </div>
+            </div>
+
+            <button type="button" onclick="startQuiz()" class="w-full bg-gradient-to-r from-pink-500 to-orange-400 hover:from-pink-600 hover:to-orange-500 text-white font-extrabold py-4 rounded-2xl shadow-lg text-base flex items-center justify-center gap-2 active:scale-95 transition">
+                <i class="fa-solid fa-play"></i>
+                クイズをはじめる
+            </button>
+        </div>
+
+        <!-- ローディング -->
+        <div id="loading-screen" class="screen flex-col items-center justify-center h-full py-16 text-center space-y-5">
+            <div class="relative flex items-center justify-center">
+                <div class="w-20 h-20 border-4 border-pink-100 border-t-pink-500 rounded-full animate-spin"></div>
+                <i class="fa-solid fa-robot text-pink-500 text-2xl absolute"></i>
+            </div>
+            <div>
+                <h3 class="text-lg font-bold text-slate-800">AIが問題を生成中…</h3>
+                <p id="loading-theme-text" class="text-xs text-pink-500 font-semibold mt-1">テーマに合わせて作成しています</p>
+            </div>
+        </div>
+
+        <!-- 2. クイズ画面 -->
+        <div id="quiz-screen" class="screen flex-col h-full justify-between space-y-4">
+            <div class="bg-gradient-to-br from-pink-50 to-orange-50 rounded-2xl p-6 text-center border border-pink-100 shadow-inner min-h-[130px] flex flex-col justify-center">
+                <span class="text-[11px] font-bold text-pink-400 tracking-widest uppercase">この日本語を英語にすると？</span>
+                <h2 id="japanese-word" class="text-3xl font-extrabold text-slate-800 my-2 tracking-wide"></h2>
+                <span id="part-of-speech" class="inline-block bg-pink-200/70 text-pink-800 text-[11px] font-bold px-2.5 py-0.5 rounded-full mx-auto"></span>
+            </div>
+
+            <div id="options-container" class="grid grid-cols-1 gap-3"></div>
+
+            <div id="feedback-area" class="h-12 flex items-center justify-center opacity-0 transition-opacity">
+                <div id="feedback-content" class="w-full py-2.5 px-4 rounded-xl font-bold text-center text-sm flex items-center justify-center gap-2"></div>
+            </div>
+        </div>
+
+        <!-- 3. 結果画面 -->
+        <div id="result-screen" class="screen flex-col items-center justify-between h-full py-2 text-center space-y-4">
+            <div>
+                <div class="inline-block px-3 py-1 bg-yellow-100 text-amber-800 text-xs font-bold rounded-full border border-yellow-300 mb-2">RESULT</div>
+                <h2 class="text-2xl font-extrabold text-slate-800">クイズ結果</h2>
+            </div>
+
+            <div class="w-36 h-36 rounded-full bg-gradient-to-tr from-pink-500 to-orange-400 flex flex-col items-center justify-center text-white shadow-xl border-4 border-white">
+                <span class="text-xs opacity-80 font-bold">正解数</span>
+                <div class="text-4xl font-extrabold">
+                    <span id="final-score">0</span><span class="text-lg" id="final-total">/5</span>
+                </div>
+                <span id="accuracy-percent" class="text-xs bg-white/20 px-2 py-0.5 rounded-full font-bold">0%</span>
+            </div>
+
+            <div class="bg-pink-50 w-full p-3 rounded-2xl border border-pink-100">
+                <p id="result-title" class="text-lg font-bold text-pink-900"></p>
+                <p id="result-comment" class="text-xs text-slate-600 mt-1 leading-relaxed"></p>
+            </div>
+
+            <div class="w-full space-y-2.5">
+                <button id="retry-missed-btn" type="button" onclick="startReviewMode()" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3.5 rounded-2xl shadow-md flex items-center justify-center gap-2 text-sm active:scale-95 transition">
+                    <i class="fa-solid fa-book-open"></i>
+                    間違えた問題を復習する（<span id="missed-count">0</span>問）
+                </button>
+                <button type="button" onclick="startQuiz()" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3.5 rounded-2xl shadow-md flex items-center justify-center gap-2 text-sm active:scale-95 transition">
+                    <i class="fa-solid fa-arrows-rotate"></i>
+                    もう一度チャレンジ
+                </button>
+                <button type="button" onclick="showScreen('start-screen')" class="w-full bg-slate-700 hover:bg-slate-800 text-white font-bold py-3.5 rounded-2xl shadow-md flex items-center justify-center gap-2 text-sm active:scale-95 transition">
+                    <i class="fa-solid fa-house"></i>
+                    レベル・テーマを選び直す
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-slate-50 py-2.5 px-4 text-[11px] text-slate-400 border-t border-slate-100 flex justify-between items-center flex-shrink-0">
+        <span>Gemini API 対応</span>
+        <span id="level-indicator" class="font-bold text-pink-500">未選択</span>
+    </footer>
+</div>
+
+<!-- 4 & 5. 解説モーダル（もう一度答える / 次の問題へ） -->
+<div id="explain-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+    <div class="modal-pop w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden border-2 border-pink-100">
+        <div class="bg-gradient-to-r from-rose-400 to-pink-500 text-white px-5 py-4 flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+                <i class="fa-solid fa-lightbulb text-yellow-200 text-lg"></i>
+            </div>
+            <div>
+                <p class="font-extrabold text-base">おしい！解説をチェック</p>
+                <p class="text-[11px] opacity-90">覚えてからもう一度トライしよう</p>
+            </div>
+        </div>
+
+        <div class="p-5 space-y-3 text-left">
+            <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-3">
+                <p class="text-[10px] font-bold text-emerald-600 mb-0.5">✅ 正しい単語の意味</p>
+                <p id="modal-correct" class="text-sm font-bold text-emerald-900 leading-snug"></p>
+            </div>
+            <div class="bg-rose-50 border border-rose-200 rounded-2xl p-3">
+                <p class="text-[10px] font-bold text-rose-500 mb-0.5">❌ 選んだ単語の意味</p>
+                <p id="modal-wrong" class="text-sm font-bold text-rose-900 leading-snug"></p>
+            </div>
+            <div class="bg-amber-50 border border-amber-200 rounded-2xl p-3">
+                <p class="text-[10px] font-bold text-amber-600 mb-0.5">💡 覚え方のコツ</p>
+                <p id="modal-tip" class="text-sm font-bold text-amber-900 leading-snug"></p>
+            </div>
+        </div>
+
+        <div class="px-5 pb-5 grid grid-cols-2 gap-2">
+            <button type="button" onclick="retryCurrentQuestion()" class="bg-sky-500 hover:bg-sky-600 text-white font-extrabold py-3.5 rounded-2xl text-sm shadow-md active:scale-95 transition flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-rotate-left"></i>
+                もう一度答える
+            </button>
+            <button type="button" onclick="skipToNextFromModal()" class="bg-slate-700 hover:bg-slate-800 text-white font-extrabold py-3.5 rounded-2xl text-sm shadow-md active:scale-95 transition flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-arrow-right"></i>
+                次の問題へ
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ========== Gemini API 設定 ==========
+    // APIキーを入れると実際のGemini呼び出しが有効になります（空ならダミーデータで動作）
+    const GEMINI_API_KEY = "";
+    const GEMINI_MODEL = "gemini-2.0-flash";
+
+    // ========== サンプル問題データ（テーマ×難易度） ==========
+    const sampleDatabase = {
+        "アニメ": {
+            basic: [
+                { jp: "魔法", en: "magic", pos: "名詞", dummy: ["power", "dream", "world"], meanings: { magic: "魔法・不思議な力", power: "力・権力", dream: "夢", world: "世界" }, tip: "magic は「マジカル！」のマジから覚えると簡単！" },
+                { jp: "勇者", en: "hero", pos: "名詞", dummy: ["king", "enemy", "friend"], meanings: { hero: "勇者・英雄", king: "王様", enemy: "敵", friend: "友達" }, tip: "hero はヒーロー。アニメの主人公といえばヒーロー！" },
+                { jp: "戦う", en: "fight", pos: "動詞", dummy: ["run", "fly", "sing"], meanings: { fight: "戦う・たたかう", run: "走る", fly: "飛ぶ", sing: "歌う" }, tip: "fight（ファイト）＝がんばれ！の語源でもあるよ。" },
+                { jp: "変身する", en: "transform", pos: "動詞", dummy: ["change", "jump", "hide"], meanings: { transform: "姿を変える・変身する", change: "変える・変わる", jump: "跳ぶ", hide: "隠れる" }, tip: "トランスフォーマー＝変身するロボット！" },
+                { jp: "冒険", en: "adventure", pos: "名詞", dummy: ["story", "journey", "quest"], meanings: { adventure: "冒険", story: "物語", journey: "旅", quest: "探求・クエスト" }, tip: "アドベンチャーゲーム＝冒険ゲーム。" }
+            ],
+            normal: [
+                { jp: "運命", en: "destiny", pos: "名詞", dummy: ["future", "chance", "history"], meanings: { destiny: "運命・定め", future: "未来", chance: "機会・偶然", history: "歴史" }, tip: "destiny は「デスティニー」。運命の出会い！" },
+                { jp: "伝説の", en: "legendary", pos: "形容詞", dummy: ["famous", "ancient", "powerful"], meanings: { legendary: "伝説の", famous: "有名な", ancient: "古代の", powerful: "強力な" }, tip: "legend（伝説）＋ ary で「伝説の〜」。" },
+                { jp: "守る", en: "protect", pos: "動詞", dummy: ["attack", "rescue", "defend"], meanings: { protect: "守る・保護する", attack: "攻撃する", rescue: "救助する", defend: "防衛する" }, tip: "プロテクター＝守ってくれるもの。" },
+                { jp: "仲間", en: "ally", pos: "名詞", dummy: ["rival", "partner", "member"], meanings: { ally: "味方・同盟者", rival: "ライバル", partner: "相棒", member: "メンバー" }, tip: "ally は「アライ」。同盟（alliance）の仲間！" },
+                { jp: "勇気", en: "courage", pos: "名詞", dummy: ["power", "hope", "spirit"], meanings: { courage: "勇気", power: "力", hope: "希望", spirit: "精神・気力" }, tip: "encourage（勇気づける）の中に courage があるよ。" }
+            ],
+            hard: [
+                { jp: "犠牲", en: "sacrifice", pos: "名詞", dummy: ["victory", "defeat", "mission"], meanings: { sacrifice: "犠牲・ささげること", victory: "勝利", defeat: "敗北", mission: "任務" }, tip: "サクリファイス。何かを捨てて守るイメージ。" },
+                { jp: "復活する", en: "revive", pos: "動詞", dummy: ["survive", "awaken", "escape"], meanings: { revive: "復活する", survive: "生き残る", awaken: "目を覚ます", escape: "逃げる" }, tip: "re（再び）＋vive（生きる）＝再び生きる！" },
+                { jp: "陰謀", en: "conspiracy", pos: "名詞", dummy: ["secret", "strategy", "conflict"], meanings: { conspiracy: "陰謀・共謀", secret: "秘密", strategy: "戦略", conflict: "対立・争い" }, tip: "コンスピラシー。陰謀論＝conspiracy theory。" },
+                { jp: "無限の", en: "infinite", pos: "形容詞", dummy: ["eternal", "endless", "maximum"], meanings: { infinite: "無限の", eternal: "永遠の", endless: "終わりのない", maximum: "最大の" }, tip: "finite＝有限 → in＋finite＝無限。" },
+                { jp: "運命づける", en: "destine", pos: "動詞", dummy: ["predict", "decide", "promise"], meanings: { destine: "運命づける", predict: "予測する", decide: "決める", promise: "約束する" }, tip: "destiny（運命）の動詞形が destine。" }
+            ]
+        },
+        "料理": {
+            basic: [
+                { jp: "料理する", en: "cook", pos: "動詞", dummy: ["eat", "wash", "cut"], meanings: { cook: "料理する", eat: "食べる", wash: "洗う", cut: "切る" }, tip: "cook＝料理する人／料理すること。クッキーも仲間！" },
+                { jp: "甘い", en: "sweet", pos: "形容詞", dummy: ["salty", "sour", "hot"], meanings: { sweet: "甘い", salty: "塩辛い", sour: "酸っぱい", hot: "辛い・熱い" }, tip: "スイート＝甘いお菓子のイメージ。" },
+                { jp: "野菜", en: "vegetable", pos: "名詞", dummy: ["fruit", "meat", "bread"], meanings: { vegetable: "野菜", fruit: "果物", meat: "肉", bread: "パン" }, tip: "ベジタブル。ベジタリアンは野菜中心の人。" },
+                { jp: "おいしい", en: "delicious", pos: "形容詞", dummy: ["fresh", "bitter", "yummy"], meanings: { delicious: "とてもおいしい", fresh: "新鮮な", bitter: "苦い", yummy: "おいしい（口語）" }, tip: "デリシャス！レストランでよく聞く言葉。" },
+                { jp: "焼く", en: "bake", pos: "動詞", dummy: ["boil", "fry", "mix"], meanings: { bake: "オーブンで焼く", boil: "煮る・ゆでる", fry: "揚げる・炒める", mix: "混ぜる" }, tip: "baker（パン屋）は bake する人。" }
+            ],
+            normal: [
+                { jp: "材料", en: "ingredient", pos: "名詞", dummy: ["recipe", "flavor", "spice"], meanings: { ingredient: "材料・成分", recipe: "レシピ", flavor: "風味", spice: "香辛料" }, tip: "イングレディエント。料理の材料のこと。" },
+                { jp: "味付けする", en: "season", pos: "動詞", dummy: ["taste", "serve", "stir"], meanings: { season: "味付けする", taste: "味見する", serve: "出す・給仕する", stir: "かき混ぜる" }, tip: "seasoning＝調味料。季節の season と同じつづり！" },
+                { jp: "栄養", en: "nutrition", pos: "名詞", dummy: ["vitamin", "calorie", "diet"], meanings: { nutrition: "栄養", vitamin: "ビタミン", calorie: "カロリー", diet: "食事・ダイエット" }, tip: "ニュートリション。栄養満点＝nutritious。" },
+                { jp: "香ばしい", en: "aromatic", pos: "形容詞", dummy: ["spicy", "creamy", "crispy"], meanings: { aromatic: "香り高い・香ばしい", spicy: "香辛料のきいた", creamy: "クリーミーな", crispy: "サクサクの" }, tip: "aroma（香り）からできた形容詞。" },
+                { jp: "煮込む", en: "simmer", pos: "動詞", dummy: ["roast", "grill", "steam"], meanings: { simmer: "弱火で煮込む", roast: "ローストする", grill: "焼く（グリル）", steam: "蒸す" }, tip: "シマー。ぐつぐつ弱火で煮ること。" }
+            ],
+            hard: [
+                { jp: "発酵する", en: "ferment", pos: "動詞", dummy: ["preserve", "ripen", "dissolve"], meanings: { ferment: "発酵する", preserve: "保存する", ripen: "熟す", dissolve: "溶ける" }, tip: "ferment＝発酵。ヨーグルトやパンに必須！" },
+                { jp: "風味", en: "flavor", pos: "名詞", dummy: ["texture", "aroma", "portion"], meanings: { flavor: "風味・味", texture: "食感", aroma: "香り", portion: "分量・一人前" }, tip: "フレーバー。ストロベリーフレーバーなど。" },
+                { jp: "食欲をそそる", en: "appetizing", pos: "形容詞", dummy: ["nutritious", "filling", "exotic"], meanings: { appetizing: "食欲をそそる", nutritious: "栄養のある", filling: "お腹いっぱいになる", exotic: "異国風の" }, tip: "appetite（食欲）＋izing＝食欲をそそる。" },
+                { jp: "調味料", en: "condiment", pos: "名詞", dummy: ["utensil", "garnish", "marinade"], meanings: { condiment: "調味料（ソースなど）", utensil: "調理器具", garnish: "飾りつけ", marinade: "漬け汁" }, tip: "コンディメント。ケチャップやマスタードのこと。" },
+                { jp: "下ごしらえする", en: "prepare", pos: "動詞", dummy: ["arrange", "measure", "garnish"], meanings: { prepare: "準備する・下ごしらえする", arrange: "並べる", measure: "量る", garnish: "飾る" }, tip: "preparation＝準備。料理の下準備も prepare。" }
+            ]
+        },
+        "default": {
+            basic: [
+                { jp: "学校", en: "school", pos: "名詞", dummy: ["park", "station", "house"], meanings: { school: "学校", park: "公園", station: "駅", house: "家" }, tip: "school はスクール。スクールバッグのスクール！" },
+                { jp: "友達", en: "friend", pos: "名詞", dummy: ["teacher", "student", "family"], meanings: { friend: "友達", teacher: "先生", student: "生徒", family: "家族" }, tip: "フレンドリー＝友達みたいに親しみやすい。" },
+                { jp: "食べる", en: "eat", pos: "動詞", dummy: ["drink", "sleep", "walk"], meanings: { eat: "食べる", drink: "飲む", sleep: "眠る", walk: "歩く" }, tip: "eat は短い単語。I eat breakfast. で覚える。" },
+                { jp: "本", en: "book", pos: "名詞", dummy: ["pen", "bag", "desk"], meanings: { book: "本", pen: "ペン", bag: "かばん", desk: "机" }, tip: "ブック＝本。ブックマークもここから！" },
+                { jp: "幸せな", en: "happy", pos: "形容詞", dummy: ["sad", "angry", "tired"], meanings: { happy: "幸せな・嬉しい", sad: "悲しい", angry: "怒った", tired: "疲れた" }, tip: "ハッピーバースデーのハッピー！" }
+            ],
+            normal: [
+                { jp: "訪問する", en: "visit", pos: "動詞", dummy: ["arrive", "leave", "stay"], meanings: { visit: "訪れる", arrive: "到着する", leave: "去る", stay: "滞在する" }, tip: "ビジター＝訪問者。" },
+                { jp: "美しい", en: "beautiful", pos: "形容詞", dummy: ["cute", "famous", "kind"], meanings: { beautiful: "美しい", cute: "かわいい", famous: "有名な", kind: "親切な" }, tip: "ビューティー（美しさ）の形容詞形。" },
+                { jp: "旅行", en: "trip", pos: "名詞", dummy: ["flight", "drive", "holiday"], meanings: { trip: "旅行・短い旅", flight: "フライト・飛行", drive: "ドライブ", holiday: "休暇" }, tip: "トリップ。デイ・トリップ＝日帰り旅行。" },
+                { jp: "楽しむ", en: "enjoy", pos: "動詞", dummy: ["hope", "want", "prefer"], meanings: { enjoy: "楽しむ", hope: "望む", want: "欲しい", prefer: "好む" }, tip: "エンジョイ！楽しもうの意味でよく使う。" },
+                { jp: "将来", en: "future", pos: "名詞", dummy: ["past", "present", "world"], meanings: { future: "未来・将来", past: "過去", present: "現在", world: "世界" }, tip: "フューチャー。未来は bright future！" }
+            ],
+            hard: [
+                { jp: "環境", en: "environment", pos: "名詞", dummy: ["government", "society", "population"], meanings: { environment: "環境", government: "政府", society: "社会", population: "人口" }, tip: "エンバイロメント。環境問題＝environmental issue。" },
+                { jp: "向上させる", en: "improve", pos: "動詞", dummy: ["increase", "protect", "produce"], meanings: { improve: "改善・向上させる", increase: "増やす", protect: "守る", produce: "生産する" }, tip: "インプルーブ。スキルを improve しよう！" },
+                { jp: "国際的な", en: "international", pos: "形容詞", dummy: ["national", "traditional", "local"], meanings: { international: "国際的な", national: "国家の", traditional: "伝統的な", local: "地元の" }, tip: "inter（間）＋national（国）＝国と国の間。" },
+                { jp: "発見する", en: "discover", pos: "動詞", dummy: ["invent", "create", "search"], meanings: { discover: "発見する", invent: "発明する", create: "創造する", search: "探す" }, tip: "ディスカバー。既にあるものを見つけること。" },
+                { jp: "機会", en: "opportunity", pos: "名詞", dummy: ["experience", "challenge", "purpose"], meanings: { opportunity: "機会・チャンス", experience: "経験", challenge: "挑戦", purpose: "目的" }, tip: "オポチュニティ。チャンスのフォーマル版！" }
+            ]
+        }
+    };
+
+    // ========== ゲーム状態 ==========
+    let selectedLevel = "basic";
+    let currentTheme = "";
+    let currentQuestions = [];
+    let currentIndex = 0;
+    let score = 0;
+    let answered = false;
+    let missedQuestionsList = [];
+    let disabledOptions = new Set(); // リトライ時に無効化した選択肢
+    let lastWrongChoice = null;
+    let isReviewMode = false;
+
+    // ========== Audio ==========
+    let audioCtx = null;
+    function initAudio() {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    function playSoundCorrect() {
+        try {
+            initAudio();
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(523.25, now);
+            osc.frequency.setValueAtTime(659.25, now + 0.1);
+            osc.frequency.setValueAtTime(783.99, now + 0.2);
+            gain.gain.setValueAtTime(0.18, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now);
+            osc.stop(now + 0.4);
+        } catch (e) {}
+    }
+    function playSoundWrong() {
+        try {
+            initAudio();
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = "triangle";
+            osc.frequency.setValueAtTime(220, now);
+            osc.frequency.setValueAtTime(165, now + 0.12);
+            gain.gain.setValueAtTime(0.15, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now);
+            osc.stop(now + 0.28);
+        } catch (e) {}
+    }
+
+    // ========== UI helpers ==========
+    function showScreen(id) {
+        ["start-screen", "loading-screen", "quiz-screen", "result-screen"].forEach(sid => {
+            const el = document.getElementById(sid);
+            el.classList.remove("active");
+        });
+        document.getElementById(id).classList.add("active");
+        if (id === "start-screen") {
+            document.getElementById("progress-bar").style.width = "0%";
+            document.getElementById("level-indicator").textContent = "未選択";
+            closeModal();
+        }
+    }
+
+    function selectLevel(btn) {
+        document.querySelectorAll(".level-btn").forEach(b => b.classList.remove("selected"));
+        btn.classList.add("selected");
+        selectedLevel = btn.dataset.level;
+    }
+
+    function setTheme(t) {
+        document.getElementById("theme-input").value = t;
+    }
+
+    function shuffleArray(arr) {
+        const a = [...arr];
+        for (let i = a.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [a[i], a[j]] = [a[j], a[i]];
+        }
+        return a;
+    }
+
+    function levelLabel(level) {
+        return { basic: "中1", normal: "中2", hard: "中3" }[level] || level;
+    }
+
+    // ========== 問題取得（Gemini or ダミー） ==========
+    async function fetchQuestionsFromGemini(level, theme) {
+        if (!GEMINI_API_KEY) return null;
+
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+        const systemInstruction = `あなたは中学生向けの優秀な英語教師です。指定された難易度とテーマに合わせて英単語クイズ5問をJSON配列のみで返してください。Markdownは不要です。`;
+        const userPrompt = `難易度: ${levelLabel(level)}、テーマ: 「${theme || "一般"}」
+各問題に jp(日本語), en(正解英単語), pos(品詞), dummy(誤答3つ配列), meanings(全選択肢の日本語意味オブジェクト), tip(覚え方のコツ) を含めてください。`;
+
+        const payload = {
+            contents: [{ parts: [{ text: userPrompt }] }],
+            systemInstruction: { parts: [{ text: systemInstruction }] },
+            generationConfig: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: "ARRAY",
+                    items: {
+                        type: "OBJECT",
+                        properties: {
+                            jp: { type: "STRING" },
+                            en: { type: "STRING" },
+                            pos: { type: "STRING" },
+                            dummy: { type: "ARRAY", items: { type: "STRING" } },
+                            meanings: { type: "OBJECT" },
+                            tip: { type: "STRING" }
+                        },
+                        required: ["jp", "en", "pos", "dummy", "meanings", "tip"]
+                    }
+                }
+            }
+        };
+
+        try {
+            const res = await fetch(apiUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+            if (!res.ok) throw new Error("API " + res.status);
+            const data = await res.json();
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (!text) return null;
+            const parsed = JSON.parse(text);
+            return Array.isArray(parsed) && parsed.length ? parsed : null;
+        } catch (e) {
+            console.warn("Gemini API failed, using sample data:", e);
+            return null;
+        }
+    }
+
+    /** ダミー非同期通信：サンプル問題を返す（APIキー無し時） */
+    async function fetchDummyQuestions(level, theme) {
+        await new Promise(r => setTimeout(r, 700 + Math.random() * 500));
+        const themeKey = Object.keys(sampleDatabase).find(k => k !== "default" && theme.includes(k)) || "default";
+        const pool = sampleDatabase[themeKey][level] || sampleDatabase.default[level];
+        return shuffleArray(pool).slice(0, 5).map(q => ({ ...q, dummy: [...q.dummy], meanings: { ...q.meanings } }));
+    }
+
+    async function generateQuestions(level, theme) {
+        const fromApi = await fetchQuestionsFromGemini(level, theme);
+        if (fromApi) return fromApi;
+        return fetchDummyQuestions(level, theme);
+    }
+
+    // ========== クイズ開始 ==========
+    async function startQuiz() {
+        initAudio();
+        currentTheme = document.getElementById("theme-input").value.trim() || "一般";
+        isReviewMode = false;
+        document.getElementById("loading-theme-text").textContent =
+            `「${levelLabel(selectedLevel)}・${currentTheme}」の問題を作成中`;
+        document.getElementById("level-indicator").textContent = `${levelLabel(selectedLevel)} / ${currentTheme}`;
+        showScreen("loading-screen");
+
+        currentQuestions = await generateQuestions(selectedLevel, currentTheme);
+        currentIndex = 0;
+        score = 0;
+        missedQuestionsList = [];
+        disabledOptions = new Set();
+
+        showScreen("quiz-screen");
+        loadQuestion();
+    }
+
+    function startReviewMode() {
+        if (!missedQuestionsList.length) return;
+        isReviewMode = true;
+        currentQuestions = shuffleArray(missedQuestionsList.map(q => ({ ...q })));
+        currentIndex = 0;
+        score = 0;
+        missedQuestionsList = [];
+        disabledOptions = new Set();
+        document.getElementById("level-indicator").textContent = "復習モード";
+        showScreen("quiz-screen");
+        loadQuestion();
+    }
+
+    // ========== 問題表示 ==========
+    function loadQuestion() {
+        answered = false;
+        disabledOptions = new Set();
+        lastWrongChoice = null;
+
+        const q = currentQuestions[currentIndex];
+        document.getElementById("current-q-num").textContent = currentIndex + 1;
+        document.getElementById("total-q-num").textContent = currentQuestions.length;
+        document.getElementById("progress-bar").style.width =
+            `${(currentIndex / currentQuestions.length) * 100}%`;
+
+        document.getElementById("japanese-word").textContent = q.jp;
+        document.getElementById("part-of-speech").textContent = q.pos || "単語";
+        document.getElementById("feedback-area").classList.add("opacity-0");
+
+        renderOptions(q);
+    }
+
+    function renderOptions(q, keepDisabled = false) {
+        const options = shuffleArray([q.en, ...(q.dummy || [])]).slice(0, 4);
+        const container = document.getElementById("options-container");
+        container.innerHTML = "";
+
+        options.forEach((opt, i) => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            const isDisabled = keepDisabled && disabledOptions.has(opt);
+            btn.className = `option-btn w-full bg-white border-2 border-slate-200 text-slate-700 font-bold py-3.5 px-4 rounded-2xl text-left text-base shadow-sm flex items-center justify-between${isDisabled ? " disabled" : ""}`;
+            btn.dataset.option = opt;
+            if (isDisabled) btn.disabled = true;
+
+            btn.innerHTML = `
+                <span class="flex items-center gap-3">
+                    <span class="w-7 h-7 rounded-lg bg-pink-50 text-pink-500 font-extrabold text-xs flex items-center justify-center border border-pink-100">${String.fromCharCode(65 + i)}</span>
+                    <span class="opt-text">${opt}</span>
+                </span>
+                <i class="fa-regular fa-circle text-slate-300 text-lg icon-indicator"></i>
+            `;
+            if (!isDisabled) {
+                btn.onclick = () => selectOption(btn, opt, q);
+            }
+            container.appendChild(btn);
+        });
+    }
+
+    // ========== 回答処理 ==========
+    function selectOption(btn, selectedText, q) {
+        if (answered) return;
+        answered = true;
+
+        const correct = q.en;
+        const isCorrect = selectedText === correct;
+        const allBtns = document.querySelectorAll("#options-container .option-btn");
+
+        if (isCorrect) {
+            score++;
+            playSoundCorrect();
+            btn.classList.remove("border-slate-200");
+            btn.classList.add("border-emerald-500", "bg-emerald-50", "text-emerald-900");
+            btn.querySelector(".icon-indicator").className = "fa-solid fa-circle-check text-emerald-500 text-xl";
+
+            allBtns.forEach(b => { b.style.pointerEvents = "none"; });
+
+            const fb = document.getElementById("feedback-content");
+            fb.className = "w-full py-2.5 px-4 rounded-xl font-bold text-center text-sm flex items-center justify-center gap-2 bg-emerald-100 text-emerald-800 border border-emerald-300";
+            fb.innerHTML = `<i class="fa-solid fa-circle-check"></i> 正解！ Excellent!`;
+            document.getElementById("feedback-area").classList.remove("opacity-0");
+
+            setTimeout(() => nextQuestion(), 900);
+        } else {
+            playSoundWrong();
+            lastWrongChoice = selectedText;
+            disabledOptions.add(selectedText);
+
+            // 復習リストへ（重複防止）
+            if (!missedQuestionsList.some(m => m.en === q.en && m.jp === q.jp)) {
+                missedQuestionsList.push({ ...q });
+            }
+
+            btn.classList.remove("border-slate-200");
+            btn.classList.add("border-rose-400", "bg-rose-50", "text-rose-900");
+            btn.querySelector(".icon-indicator").className = "fa-solid fa-circle-xmark text-rose-500 text-xl";
+
+            openExplainModal(q, selectedText);
+        }
+    }
+
+    function openExplainModal(q, wrongWord) {
+        const meanings = q.meanings || {};
+        document.getElementById("modal-correct").textContent =
+            `${q.en} … ${meanings[q.en] || q.jp}`;
+        document.getElementById("modal-wrong").textContent =
+            `${wrongWord} … ${meanings[wrongWord] || "（別の意味の単語です）"}`;
+        document.getElementById("modal-tip").textContent =
+            q.tip || `${q.en} は「${q.jp}」という意味だよ。声に出して覚えてみよう！`;
+
+        const modal = document.getElementById("explain-modal");
+        modal.classList.remove("hidden");
+        modal.classList.add("flex");
+    }
+
+    function closeModal() {
+        const modal = document.getElementById("explain-modal");
+        modal.classList.add("hidden");
+        modal.classList.remove("flex");
+    }
+
+    /** 5. もう一度答える：間違えた選択肢だけグレーアウトして再挑戦 */
+    function retryCurrentQuestion() {
+        closeModal();
+        answered = false;
+        lastWrongChoice = null;
+        document.getElementById("feedback-area").classList.add("opacity-0");
+
+        const q = currentQuestions[currentIndex];
+        // 選択肢を再描画し、間違えたものだけ無効化
+        renderOptions(q, true);
+    }
+
+    /** モーダルから次の問題へ（この問題は不正解のまま進む） */
+    function skipToNextFromModal() {
+        closeModal();
+        nextQuestion();
+    }
+
+    function nextQuestion() {
+        currentIndex++;
+        if (currentIndex < currentQuestions.length) {
+            loadQuestion();
+        } else {
+            showResults();
+        }
+    }
+
+    function showResults() {
+        document.getElementById("progress-bar").style.width = "100%";
+        showScreen("result-screen");
+
+        const total = currentQuestions.length;
+        document.getElementById("final-score").textContent = score;
+        document.getElementById("final-total").textContent = `/${total}`;
+        const accuracy = total ? Math.round((score / total) * 100) : 0;
+        document.getElementById("accuracy-percent").textContent = `${accuracy}%`;
+
+        const titleEl = document.getElementById("result-title");
+        const commentEl = document.getElementById("result-comment");
+
+        if (accuracy === 100) {
+            titleEl.textContent = "🏆 パーフェクト！全問正解！";
+            commentEl.textContent = "素晴らしい！完璧にマスターできています！";
+            // 満点紙吹雪
+            if (typeof confetti === "function") {
+                confetti({ particleCount: 120, spread: 70, origin: { y: 0.65 } });
+                setTimeout(() => confetti({ particleCount: 80, angle: 60, spread: 55, origin: { x: 0 } }), 200);
+                setTimeout(() => confetti({ particleCount: 80, angle: 120, spread: 55, origin: { x: 1 } }), 350);
+            }
+        } else if (accuracy >= 80) {
+            titleEl.textContent = "✨ お見事！高得点！";
+            commentEl.textContent = "あと少しで満点！復習してもう一度挑戦しよう！";
+        } else if (accuracy >= 50) {
+            titleEl.textContent = "👍 ナイスファイト！";
+            commentEl.textContent = "よくがんばったね！間違えた問題を復習してみよう！";
+        } else {
+            titleEl.textContent = "🌱 のびしろたっぷり！";
+            commentEl.textContent = "繰り返し練習すれば必ず覚えられるよ！";
+        }
+
+        const missedBtn = document.getElementById("retry-missed-btn");
+        document.getElementById("missed-count").textContent = missedQuestionsList.length;
+        if (missedQuestionsList.length > 0 && !isReviewMode) {
+            missedBtn.classList.remove("hidden");
+        } else if (missedQuestionsList.length > 0) {
+            missedBtn.classList.remove("hidden");
+        } else {
+            missedBtn.classList.add("hidden");
+        }
+    }
+</script>
+</body>
+</html>
