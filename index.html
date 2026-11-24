@@ -120,6 +120,7 @@
         <div>問題 <span id="currentQNum" class="text-emerald-600 text-base font-extrabold">1</span> / <span id="totalQNum">10</span></div>
         <div id="badgeTopic" class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md">中1レベル</div>
       </div>
+      <p id="geminiStatus" class="hidden text-xs font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2"></p>
 
       <!-- Question Card -->
       <div class="bg-white p-6 rounded-3xl shadow-xl border-4 border-emerald-100 text-center flex flex-col items-center justify-center min-h-[160px] relative overflow-hidden">
@@ -244,6 +245,20 @@
     let wrongQuestions = [];
     let isAnswered = false;
     let lastSelectedIndex = null;
+    const GEMINI_MODEL = 'gemini-3-flash-preview';
+    let lastGeminiError = '';
+
+    async function fetchGeminiApiKey() {
+      const response = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.apiKey) {
+        throw new Error(data.error || 'Vercel から API キーを取得できませんでした');
+      }
+      return data.apiKey;
+    }
 
     // --- Audio System (Web Audio API) ---
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -365,11 +380,18 @@
           })
         });
 
-        if (!response.ok) throw new Error('API Request Failed');
+        if (!response.ok) {
+          const errorBody = await response.text();
+          throw new Error(`Gemini API error (${response.status}): ${errorBody.slice(0, 180)}`);
+        }
         
         const data = await response.json();
-        const jsonText = data.candidates[0].content.parts[0].text;
+        const parts = data.candidates?.[0]?.content?.parts || [];
+        const answerParts = parts.filter(part => part.text && !part.thought);
+        const jsonText = (answerParts.length ? answerParts : parts.filter(part => part.text)).at(-1)?.text;
+        if (!jsonText) throw new Error('Gemini の応答に問題データがありません');
         const parsed = JSON.parse(jsonText);
+        lastGeminiError = '';
         
         return parsed.map(q => {
           const shuffledOptions = [...q.options].sort(() => Math.random() - 0.5);
@@ -382,6 +404,7 @@
         });
       } catch (err) {
         console.error("Gemini API Error, fallback to local data:", err);
+        lastGeminiError = err.message || 'Gemini API の呼び出しに失敗しました';
         return getFallbackQuestions(count);
       }
     }
@@ -450,7 +473,7 @@
     // --- Quiz Flow Control ---
     async function startQuiz() {
       const topicInput = document.getElementById('customTopic').value.trim();
-      
+
       document.getElementById('setupScreen').classList.add('hidden');
       document.getElementById('loadingScreen').classList.remove('hidden');
 
@@ -466,6 +489,14 @@
       
       const levelLabels = { 'grade1': '中1', 'grade2': '中2', 'grade3': '中3・入試' };
       document.getElementById('badgeTopic').innerText = topicInput ? `テーマ: ${topicInput}` : `${levelLabels[selectedLevel]}レベル`;
+
+      const geminiStatus = document.getElementById('geminiStatus');
+      if (lastGeminiError) {
+        geminiStatus.textContent = `Gemini に接続できなかったため、サンプル問題を出しています。${lastGeminiError}`;
+        geminiStatus.classList.remove('hidden');
+      } else {
+        geminiStatus.classList.add('hidden');
+      }
 
       document.getElementById('loadingScreen').classList.add('hidden');
       document.getElementById('quizScreen').classList.remove('hidden');
