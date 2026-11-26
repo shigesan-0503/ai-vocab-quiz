@@ -254,7 +254,7 @@
         headers: { 'Content-Type': 'application/json' }
       });
       const data = await response.json().catch(() => ({}));
-      console.log('API=' + data.apiKey );
+      //console.log('API=' + data.apiKey );
       if (!response.ok || !data.apiKey) {
         throw new Error(data.error || 'Vercel から API キーを取得できませんでした');
       }
@@ -372,7 +372,7 @@
       try {
         const apiKey = await fetchGeminiApiKey();
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${apiKey}`;
-        console.log('URL=' + url );
+        //console.log('URL=' + url );
         const response = await fetch(url,
             { 
                method: 'POST',
@@ -387,7 +387,7 @@
 
         if (!response.ok) {
           const errorBody = await response.text();
-          throw new Error(`Gemini API error (${response.status}): ${errorBody.slice(0, 180)}`);
+          throw new Error(`Gemini API error (${response.status}): ごめんね。2~3分後にまたお願い}`);
         }
         
         const data = await response.json();
